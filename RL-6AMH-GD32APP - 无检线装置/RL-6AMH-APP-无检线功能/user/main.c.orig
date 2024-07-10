@@ -1,0 +1,73 @@
+#include "gd32f10x.h"
+#include "systick.h"
+#include <stdio.h>
+#include "main.h"
+#include "App.h"
+
+/*
+外部复位按键key,按下时为1，松开时为0；中断方法应为上升沿
+CAN短路检测，无信号时为1，有差分信号时为0
+24V电源开路检测，开路时输出1，环路正常时为0
+24V短路检测，正常时1，短路时是0，所以中断用下降沿处理
+*/
+
+/*!
+    \brief      main function
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+uint8_t datein=0;
+int main(void)
+{
+    rcu_periph_clock_enable(RCU_AF);
+    gpio_pin_remap_config(GPIO_SWJ_SWDPENABLE_REMAP, ENABLE);
+    MX_GPIO_Init();
+    SysTemInit();
+    gd_eval_com0_init();
+    gd_eval_com2_init();
+    adc_config();
+    /* configure systick */
+    systick_config();
+    timer_config();
+    GetAddr();
+    /* print out the clock frequency of system, AHB, APB1 and APB2 */
+    printf("\r\nCK_SYS is %d", rcu_clock_freq_get(CK_SYS));
+    printf("\r\nCK_AHB is %d", rcu_clock_freq_get(CK_AHB));
+    printf("\r\nCK_APB1 is %d", rcu_clock_freq_get(CK_APB1));
+    printf("\r\nCK_APB2 is %d", rcu_clock_freq_get(CK_APB2));
+    SysDate.MBpower=SysDate.MBpower|0x01;
+	BackPower_Off;
+    MainPower_On;
+	
+    while(1)
+    {
+        if(Systime>1000)//1S 采集一次
+        {
+            Systime=0;
+            SensorCheck();
+            if(SendSensorState(TXservel,1,10)==0)//发送失败
+            {
+                SendSensorState(TXservel,1,10);
+            }
+        }
+        DelRxdate();
+        //6Q超时无应答正常数据******************
+        if(Q6State.Q6timeOut>=10)
+        {
+            SysDate.A6_state=0;//异常
+//            MX6Q_RST_L;//6Q复位控制
+//            HAL_Delay(500);
+//            MX6Q_RST_H;
+//            Q6State.NorMalflg=0;
+//            Q6State.Q6timeOut=0;
+        }
+
+
+//        datein=PowerShort_in;
+//        printf("add=%d\r\n",datein);
+
+//        LED1V;
+//        delay_1ms(500);
+    }
+}

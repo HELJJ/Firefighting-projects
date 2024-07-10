@@ -1,0 +1,136 @@
+#include "gpio.h"
+
+void MX_GPIO_Init(void)
+{
+    rcu_periph_clock_enable(RCU_GPIOA);
+    rcu_periph_clock_enable(RCU_GPIOB);
+    rcu_periph_clock_enable(RCU_GPIOC);
+    rcu_periph_clock_enable(RCU_GPIOD);
+    rcu_periph_clock_enable(RCU_GPIOE);
+    //******初始化必须IO口*****************************
+    DogSet0_H;
+    DogSet1_H;
+    DogSet2_L;
+    M6QRST_H;
+    RelayCtrl_Off;
+    RelayCheck_On;
+    MainPower_Off;
+    BackPower_Off;
+//********看门狗*********************
+//输出
+    gpio_init(DogFeed_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,DogFeed_Pin);
+    gpio_init(DogSet0_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,DogSet0_Pin);
+    gpio_init(DogSet1_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,DogSet1_Pin);
+    gpio_init(DogSet2_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,DogSet2_Pin);
+//********EEPROM*********************
+//输出
+    gpio_init(EESAD_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,EESAD_Pin);
+    gpio_init(EESCL_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,EESCL_Pin);
+//********拨码开关号*******************
+//输入
+    gpio_init(K1_SW1_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,K1_SW1_Pin);
+    gpio_init(K2_SW1_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,K2_SW1_Pin);
+    gpio_init(K4_SW1_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,K4_SW1_Pin);
+    gpio_init(K8_SW1_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,K8_SW1_Pin);
+//*******6Q 复位**************
+//输出
+    gpio_init(M6QRST_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,M6QRST_Pin);
+//*******按键检测*******************
+//输入
+    gpio_init(Key_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,Key_Pin);
+//********电磁阀********************
+//输出
+    gpio_init(RelayCheck_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,RelayCheck_Pin);
+    gpio_init(RelayCtrl_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,RelayCtrl_Pin);
+//AD在专门文件配置
+//***********LED指示灯******************
+    gpio_init(LED1_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,LED1_Pin);
+    gpio_init(LED2_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,LED2_Pin);
+    gpio_init(LED3_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,LED3_Pin);
+    gpio_init(LED4_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,LED4_Pin);
+    gpio_init(LED5_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,LED5_Pin);
+    gpio_init(LED6_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,LED6_Pin);
+    gpio_init(LED7_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,LED7_Pin);
+//********CAN短路检测***********************
+//输入------中断模式
+    gpio_init(CANShort_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,CANShort_Pin);
+//*******主电**输出**************************
+    gpio_init(MainPower_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,MainPower_Pin);
+//*******备电****输出*************************
+    gpio_init(BackPower_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,BackPower_Pin);
+//********超级电容充电使能********************************		
+		gpio_init(ChargEn_GPIO_Port, GPIO_MODE_OUT_PP, GPIO_OSPEED_50MHZ,ChargEn_Pin);
+		
+		
+		
+//********电源检测*************************
+    gpio_init(PowerOpen_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,PowerOpen_Pin);
+    gpio_init(PowerShort_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,PowerShort_Pin);
+    DogSet0_H;
+    DogSet1_H;
+    DogSet2_L;
+    M6QRST_H;
+    RelayCtrl_Off;
+    RelayCheck_On;
+    MainPower_Off;
+    BackPower_Off;
+    LED1_Off;
+    LED2_Off;
+    LED3_Off;
+    LED4_Off;
+    LED5_Off;
+    LED6_Off;
+    LED7_Off;
+		ChargEn_On;
+//**********中断配置*****************************
+//**CAN短路检测计数，电源短路检测*************************
+    rcu_periph_clock_enable(RCU_GPIOB);
+    gpio_init(CANShort_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,CANShort_Pin);
+    /* enable and set key EXTI interrupt to the lowest priority */
+    nvic_irq_enable(EXTI10_15_IRQn, 2U, 1U);
+    /* connect key EXTI line to key GPIO pin */
+    gpio_exti_source_select(GPIO_PORT_SOURCE_GPIOC,GPIO_PIN_SOURCE_15);
+    /* configure key EXTI line */
+    exti_init(EXTI_15, EXTI_INTERRUPT, EXTI_TRIG_FALLING);
+    exti_interrupt_flag_clear(EXTI_15);
+//****电源短路故障检测**************************************
+    rcu_periph_clock_enable(RCU_GPIOA);
+    gpio_init(PowerShort_GPIO_Port,GPIO_MODE_IPU, GPIO_OSPEED_50MHZ,PowerShort_Pin);
+    /* enable and set key EXTI interrupt to the lowest priority */
+    nvic_irq_enable(EXTI1_IRQn, 2U, 0U);
+    /* connect key EXTI line to key GPIO pin */
+    gpio_exti_source_select(GPIO_PORT_SOURCE_GPIOA,GPIO_PIN_SOURCE_1);
+    /* configure key EXTI line */
+    exti_init(EXTI_1, EXTI_INTERRUPT, EXTI_TRIG_FALLING);
+    exti_interrupt_flag_clear(EXTI_1);
+}
+//***************IO 口翻转***********************************
+void GPIO_TogglePin(uint32_t gpio_periph, uint32_t pin)
+{
+
+    if(gpio_output_bit_get(gpio_periph,pin)==RESET)
+    {
+        gpio_bit_write(gpio_periph,pin,SET);
+    }
+    else
+    {
+        gpio_bit_write(gpio_periph,pin,RESET);
+    }
+}
+
+//***********探测器上电处理********************************
+void PowerBusOn(void)
+{
+
+
+
+
+
+
+
+
+
+}
+
+
+

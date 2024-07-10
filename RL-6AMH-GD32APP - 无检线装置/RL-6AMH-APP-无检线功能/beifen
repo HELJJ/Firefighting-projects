@@ -1,0 +1,118 @@
+/* Define to prevent recursive inclusion -------------------------------------*/
+#ifndef __GPIO_H__
+#define __GPIO_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Includes ------------------------------------------------------------------*/
+#include "gd32f10x.h"
+#include "gd32f10x_gpio.h"
+
+//********看门狗*********************
+#define DogFeed_Pin GPIO_PIN_8
+#define DogFeed_GPIO_Port GPIOA
+#define DogSet0_Pin GPIO_PIN_14
+#define DogSet0_GPIO_Port GPIOB
+#define DogSet1_Pin GPIO_PIN_12
+#define DogSet1_GPIO_Port GPIOB
+#define DogSet2_Pin GPIO_PIN_13
+#define DogSet2_GPIO_Port GPIOB
+//*******EEPROM***********************
+#define EESAD_Pin GPIO_PIN_11
+#define EESAD_GPIO_Port GPIOB
+#define EESCL_Pin GPIO_PIN_10
+#define EESCL_GPIO_Port GPIOB
+//********拨码开关号*******************
+#define K8_SW1_Pin GPIO_PIN_6
+#define K8_SW1_GPIO_Port GPIOC
+#define K4_SW1_Pin GPIO_PIN_7
+#define K4_SW1_GPIO_Port GPIOC
+#define K2_SW1_Pin GPIO_PIN_8
+#define K2_SW1_GPIO_Port GPIOC
+#define K1_SW1_Pin GPIO_PIN_9
+#define K1_SW1_GPIO_Port GPIOC
+//*******6Q 复位**************
+#define M6QRST_Pin GPIO_PIN_15
+#define M6QRST_GPIO_Port GPIOB
+//*******按键检测*******************
+#define Key_Pin GPIO_PIN_13
+#define Key_GPIO_Port GPIOC
+//********电磁阀********************
+#define RelayCheck_Pin GPIO_PIN_5
+#define RelayCheck_GPIO_Port GPIOA
+#define RelayCtrl_Pin GPIO_PIN_3
+#define RelayCtrl_GPIO_Port GPIOA
+#define RelayAD_Pin GPIO_PIN_7
+#define RelayAD_GPIO_Port GPIOA
+//*********反馈阀AD********************
+#define FeedBackAD_Pin GPIO_PIN_0
+#define FeedBackAD_GPIO_Port GPIOB
+//***********LED指示灯******************
+#define LED1_Pin GPIO_PIN_3
+#define LED1_GPIO_Port GPIOB
+#define LED2_Pin GPIO_PIN_4
+#define LED2_GPIO_Port GPIOB
+#define LED3_Pin GPIO_PIN_5
+#define LED3_GPIO_Port GPIOB
+#define LED4_Pin GPIO_PIN_6
+#define LED4_GPIO_Port GPIOB
+#define LED5_Pin GPIO_PIN_7
+#define LED5_GPIO_Port GPIOB
+#define LED6_Pin GPIO_PIN_8
+#define LED6_GPIO_Port GPIOB
+#define LED7_Pin GPIO_PIN_9
+#define LED7_GPIO_Port GPIOB
+//********CAN短路检测***********************
+#define CANShort_Pin GPIO_PIN_15
+#define CANShort_GPIO_Port GPIOC
+//*******主电****************************
+#define MainPower_Pin GPIO_PIN_0
+#define MainPower_GPIO_Port GPIOA
+//*******备电****************************
+#define BackPower_Pin GPIO_PIN_2
+#define BackPower_GPIO_Port GPIOE
+//********电源检测*************************
+#define PowerOpen_Pin GPIO_PIN_3
+#define PowerOpen_GPIO_Port GPIOE
+
+#define PowerShort_Pin GPIO_PIN_1
+#define PowerShort_GPIO_Port GPIOA
+
+#define PowerAD_Pin GPIO_PIN_2
+#define PowerAD_GPIO_Port GPIOA
+
+
+
+
+#define Dog_H gpio_bit_write(Dog_IO_GPIO_Port,Dog_IO_Pin,SET);
+#define Dog_L gpio_bit_write(Dog_IO_GPIO_Port,Dog_IO_Pin,RESET);
+
+#define S_OUT_in        gpio_input_bit_get(S_Out_GPIO_Port,S_Out_Pin)
+
+#define K8_SW1_in        gpio_input_bit_get(K8_SW1_GPIO_Port,K8_SW1_Pin)
+#define K4_SW1_in        gpio_input_bit_get(K4_SW1_GPIO_Port,K4_SW1_Pin)
+#define K2_SW1_in        gpio_input_bit_get(K2_SW1_GPIO_Port,K2_SW1_Pin)
+#define K1_SW1_in        gpio_input_bit_get(K1_SW1_GPIO_Port,K1_SW1_Pin)
+
+
+#define OP_EN_H        gpio_bit_write(OP_EN_GPIO_Port,OP_EN_Pin,SET);
+#define OP_EN_L        gpio_bit_write(OP_EN_GPIO_Port,OP_EN_Pin,RESET);
+
+
+
+
+
+
+
+void MX_GPIO_Init(void);
+
+
+
+
+#ifdef __cplusplus
+}
+#endif
+#endif /*__ GPIO_H__ */
+

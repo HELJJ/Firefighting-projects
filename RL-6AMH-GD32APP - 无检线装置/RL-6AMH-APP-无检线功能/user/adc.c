@@ -1,0 +1,100 @@
+/* Includes ------------------------------------------------------------------*/
+#include "adc.h"
+#include "gd32f10x_adc.h"
+#include "App.h"
+
+
+
+/*!
+    \brief      configure the different system clocks
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+void rcu_config(void)
+{
+    /* enable GPIOA clock */
+    rcu_periph_clock_enable(RCU_GPIOA);
+    rcu_periph_clock_enable(RCU_GPIOB);
+    /* enable ADC clock */
+    rcu_periph_clock_enable(RCU_ADC0);
+    /* config ADC clock */
+    rcu_adc_clock_config(RCU_CKADC_CKAPB2_DIV8);
+}
+
+/*!
+    \brief      configure the GPIO peripheral
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+void gpio_config(void)
+{
+    /* config the GPIO as analog mode */
+    gpio_init(GPIOA, GPIO_MODE_AIN, GPIO_OSPEED_50MHZ, GPIO_PIN_2);
+    gpio_init(GPIOA, GPIO_MODE_AIN, GPIO_OSPEED_50MHZ, GPIO_PIN_7);
+    gpio_init(GPIOB, GPIO_MODE_AIN, GPIO_OSPEED_50MHZ, GPIO_PIN_0);
+}
+
+/*!
+    \brief      configure the ADC peripheral
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+void adc_config(void)
+{
+    rcu_config();
+    gpio_config();
+
+    adc_deinit(ADC0);
+    /* ADC mode config */
+    adc_mode_config(ADC_MODE_FREE);
+    /* ADC data alignment config */
+    adc_data_alignment_config(ADC0, ADC_DATAALIGN_RIGHT);
+
+//	 /* ADC temperature and Vrefint enable */
+//    adc_tempsensor_vrefint_enable();
+
+    /* ADC channel length config */
+    adc_channel_length_config(ADC0, ADC_REGULAR_CHANNEL, 1U);
+    /* ADC trigger config */
+    adc_external_trigger_source_config(ADC0, ADC_REGULAR_CHANNEL, ADC0_1_2_EXTTRIG_REGULAR_NONE);
+    /* ADC external trigger config */
+    adc_external_trigger_config(ADC0, ADC_REGULAR_CHANNEL, ENABLE);
+    /* enable ADC interface */
+    adc_enable(ADC0);
+    delay_ms(2);
+    /* ADC calibration and reset calibration */
+    adc_calibration_enable(ADC0);
+}
+
+
+/*!
+    \brief      ADC channel sample
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+uint16_t adc_channel_sample(uint8_t channel)
+{
+    /* ADC regular channel config */
+    adc_regular_channel_config(ADC0, 0U, channel, ADC_SAMPLETIME_71POINT5);
+    /* ADC software trigger enable */
+    adc_software_trigger_enable(ADC0, ADC_REGULAR_CHANNEL);
+
+    /* wait the end of conversion flag */
+    while(!adc_flag_get(ADC0, ADC_FLAG_EOC));
+    /* clear the end of conversion flag */
+    adc_flag_clear(ADC0, ADC_FLAG_EOC);
+    /* return regular channel sample value */
+    return (adc_regular_data_read(ADC0));
+}
+
+
+void GetADC5(void)
+{
+    ADCGet[0]=adc_channel_sample(ADC_CHANNEL_2);//电流采集
+    ADCGet[1]=adc_channel_sample(ADC_CHANNEL_7);//电磁阀
+    ADCGet[2]=adc_channel_sample(ADC_CHANNEL_8);//反馈阀
+}

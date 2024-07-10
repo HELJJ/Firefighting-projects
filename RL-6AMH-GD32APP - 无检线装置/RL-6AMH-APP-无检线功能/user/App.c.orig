@@ -1,0 +1,492 @@
+/**
+  ******************************************************************************
+  * @file           : App.c
+  * @brief          : 烟感所有功能函数
+  ******************************************************************************
+  */
+
+
+/* Start user code for include. Do not edit comment generated here */
+#include <stdio.h>
+#include <stdarg.h>
+#include "App.h"
+#include "string.h"
+
+LineCheck Fback;//反馈阀，硬线按钮
+DCF DCFState;//电磁阀状态
+uint16_t ADCGet[5];//存储AD采集值
+Resetbu ResButton;//复位按键判断
+TXmode ReportInfo;//上报信息结构
+Rxmode ReceiveInfo;//接收信息结构
+uint16_t TXservel=0;//发送序列号
+uint16_t Systime=0;//发送计时用
+Q6Q Q6State;//6Q状态
+uint8_t HostAddr=0;//主机地址
+uint16_t ADCGet[5];//存储AD采集值
+PowerLine_flg PowerLine;//电源线状态
+Sys_flg SysDate;//系统信息
+void ClearDog(void)
+{
+//   fwdgt_reload_value_config(2*625);
+
+    FWDGT_CTL=0xAAAA;
+    DogFeedV;
+
+}
+/////////////////////////////////////////////////////////////////////////
+void delay_us( uint32_t tt )//1.68-2us
+{
+    uint32_t i = 0, n = 0;
+    for( i = 0; i < tt; i++ )
+    {
+        for( n = 0; n <23; n++ )
+        {
+            __NOP;
+        }
+    }
+}
+void delay_ms( uint32_t tt )//
+{
+    uint32_t i = 0;
+    for( i = 0; i < tt; i++ )
+    {
+        delay_us( 1070 );
+    }
+}
+
+uint8_t GetSensorAdd(void)
+{
+    uint8_t  SW1X=0;
+    uint8_t Backadd=0;
+    //个位SW1
+    //8
+    if(K8_SW1_in==0)
+    {
+        SW1X=SW1X|0x08;
+    }
+    //4
+    if(K4_SW1_in==0)
+    {
+        SW1X=SW1X|0x04;
+    }
+    //2
+    if(K2_SW1_in==0)
+    {
+        SW1X=SW1X|0x02;
+    }
+    //1
+    if(K1_SW1_in==0)
+    {
+        SW1X=SW1X|0x01;
+    }
+
+    Backadd=SW1X;
+    return Backadd;
+}
+//获取烟感地址
+void GetAddr(void)
+{
+    uint8_t add[3],i=0;
+    for(i=0; i<3; i++)
+    {
+        add[i]=GetSensorAdd();
+        delay_ms(100);
+    }
+    if((add[0]==add[1])&&(add[1]==add[2]))
+    {
+        HostAddr=add[0];
+    }
+    else
+    {
+        HostAddr=255;
+    }
+}
+//*****看门狗开启************************
+void DogOn(void)
+{
+    //*******开启看门狗定时3S中*************
+    DogFeed_H;
+    DogSet2_H;
+    DogSet1_H;
+    DogSet0_L;
+}
+//*****看门狗停止************************
+void DogOff(void)
+{
+    //*******关闭看门狗********************
+    DogFeed_H;
+    DogSet2_L;
+    DogSet1_H;
+    DogSet0_H;
+}
+
+//******系统初始化*************************
+void SysTemInit(void)
+{
+    DogSet0_H;
+    DogSet1_H;
+    DogSet2_L;
+    M6QRST_H;
+    RelayCtrl_Off;
+    RelayCheck_On;
+    MainPower_Off;
+    BackPower_Off;
+    DCFState.LineState=LineLook;
+    SysDate.CanCount=0;
+    SysDate.Dogflg=0;
+    SysDate.Powerflg=1;
+    SysDate.Servel=0;
+    SysDate.MBpower=0;
+    delay_ms(500);
+}
+
+//**********校验程序**************************
+uint8_t Crc_RTU_Data(uint8_t *data,uint32_t len)
+{
+    uint8_t CrcBack=0;
+    uint16_t crc = 0xffff; // 16位crc寄存器预置
+    for (uint32_t i = 0; i < len; i++)
+    {   // 循环计算每个数据
+        crc ^= data[i];// 将八位数据与crc寄存器亦或，然后存入crc寄存器
+        for (uint8_t j = 0; j < 8; j++)
+        {   // 循环计算数据的
+            if (crc & 0x0001)
+            {   // 判断右移出的是不是1，如果是1则与多项式进行异或。
+                crc >>= 1; // 将数据右移一位
+                crc ^= 0xa001; // 与上面的多项式进行异或
+            }
+            else
+            {   // 如果不是1，则直接移出
+                crc >>= 1; // 将数据右移一位
+            }
+        }
+    }
+
+    CrcBack=crc;
+    return CrcBack;
+}
+
+//*AD0电流采集，AD1电磁阀，AD2反馈阀
+
+void SensorCheck(void)
+{
+    //线判断是否需要闭合电磁阀检线继电器
+    if(DCFState.LineState==LineLook)//检线状态
+    {
+        RelayCheck_On;
+    }
+    else
+    {
+        RelayCheck_Off;
+    }
+    GetADC5();
+    printf("%.3f,%.3f,%.3f,%d\r\n",ADCGet[0]*RefV/4096,ADCGet[1]*RefV/4096,ADCGet[2]*RefV/4096,ReportInfo.CanCount);
+//***********电磁阀***************************
+    if(DCFState.LineState==LineLook)//检线状态
+    {
+        //****检线状态开始计算有关参数**********************
+        DCFState.LineAd=ADCGet[1];
+        DCFState.LineV=ADCGet[1]*RefV/4096;
+        if(DCFState.LineV<0.5)
+        {
+            DCFState.LineFlg=LineOpen;//开路
+        }
+        else if(DCFState.LineV>2.10)
+        {
+            DCFState.LineFlg=LineNormal;		//正常
+        }
+        else
+        {
+            DCFState.LineFlg=LineGuzhang;//不在正常参数范围内
+        }
+    }
+    else
+    {
+        //****非检线状态不计算线路是否正常
+
+    }
+//***********反馈阀******2K 1.164V  4.7K 2.118V  10K 2.394V   47K 2.63V 无穷大2.69V 这个可以随时修改
+    Fback.LineAd=ADCGet[2];
+    Fback.LineV=ADCGet[2]*RefV/4096;
+//************无终端电阻方式*****************************
+    if(Fback.LineV<0.5)
+    {
+        Fback.LineFlg=LineOn;
+    }
+		else if(Fback.LineV>2.0)
+    {
+        Fback.LineFlg=LineOff;
+    }
+    else
+    {
+        Fback.LineFlg=LineGuzhang;//不在正常参数范围内
+    }
+		
+//******4.7K终端电阻模式***************************
+//		if(Fback.LineV<0.5)
+//    {
+//        Fback.LineFlg=LineOn;
+//    }
+//		else if((Fback.LineV>1.0)&&(Fback.LineV<2.3))
+//    {
+//        Fback.LineFlg=LineOff;
+//    }
+//    else if(Fback.LineV>2.4)
+//    {
+//        Fback.LineFlg=LineOpen;//不在正常参数范围内
+//    }
+//		else
+//		{
+//			Fback.LineFlg=LineGuzhang;//不在正常参数范围内
+//		}
+//***********电源线开路检测*******************************
+    if(PowerOpen_in!=RESET)
+    {
+//        LED7_On;
+        //*********开路或者短路********************
+        PowerLine.OpenFlg[PowerLine.OpenCount]=1;
+    }
+    else
+    {
+//        LED7_Off;
+        //***********正常*******************
+        PowerLine.OpenFlg[PowerLine.OpenCount]=0;
+    }
+    PowerLine.OpenCount++;
+    if(PowerLine.OpenCount>2)PowerLine.OpenCount=0;
+    if((PowerLine.OpenFlg[0]==1)&&(PowerLine.OpenFlg[1]==1)&&(PowerLine.OpenFlg[2]==1))
+    {
+        PowerLine.LineOpen=1;//开路后
+        //开路后如果没有短路，将备电打开，如果短路则主备电同时关闭
+        if(PowerLine.LineShort==1)
+        {
+            MainPower_Off;
+            BackPower_Off;
+            SysDate.MBpower=0x00;
+            SysDate.Powerflg=3;
+        }
+        else
+        {
+            SysDate.MBpower=SysDate.MBpower|0x02;
+            SysDate.Powerflg=2;
+            BackPower_On;
+        }
+    }
+    else
+    {
+        PowerLine.LineOpen=0;
+    }
+//***************更新Old值******************************************************
+    if(DCFState.LineState==LineLook)//检线状态
+    {
+        DCFState.LineFlgold=DCFState.LineFlg;
+    }
+    Fback.LineFlgold= Fback.LineFlg;
+}
+
+/*
+打包检测数据上传
+servel 发送序列号
+Mode 1主动发送  2回复数据
+timeout*10ms 等待回复超时数据*******
+
+返回0发送失败，返回1发送成功
+
+*/
+uint8_t SendSensorState(uint16_t Servel,uint8_t Mode,uint16_t timeout)
+{
+    uint16_t timenow=0;
+    uint8_t back=1;
+    ReportInfo.Head1=0XA5;
+    ReportInfo.Head2=0X5A;
+    ReportInfo.Len=0x10;
+    ReportInfo.SWadd=HostAddr;
+    ReportInfo.Dogflg=SysDate.Dogflg;
+    ReportInfo.Fback_State=Fback.LineFlg;
+    ReportInfo.DCF_State=DCFState.LineFlg;
+    ReportInfo.Reset_State=ResButton.ButtonFlg;
+//*****ReportInfo.CanCount***************************************
+    ReportInfo.CanCount=SysDate.CanCount;
+    SysDate.CanCount=0;
+    ReportInfo.PowerFlg=SysDate.Powerflg;
+    ReportInfo.MBpower=SysDate.MBpower;
+    ReportInfo.rev=0;
+    if(Mode==1)
+    {
+        ReportInfo.Serial=SysDate.Servel;
+    }
+    else
+    {
+        ReportInfo.Serial=Servel;
+    }
+    ReportInfo.SendMode=Mode;
+    ReportInfo.S_CRC=Crc_RTU_Data((uint8_t *)&ReportInfo, sizeof(ReportInfo)-1);
+    UART_Send_Nbytes((uint8_t *)&ReportInfo, sizeof(ReportInfo));
+
+    timenow=0;
+    if(Mode==1)//需要等待回复数据
+    {
+        while(timenow<timeout)
+        {
+            DelRxdate();
+            if((ReceiveInfo.Serial==SysDate.Servel)&&(ReceiveInfo.SendMode==2))
+            {
+                back=1;
+                break;
+            }
+            delay_ms(20);
+            timenow++;
+        }
+        if(timenow<timeout)
+        {
+            back=1;
+        }
+        else
+        {
+            back=0;
+        }
+    }
+    printf("AD%d,D%d,F%d,D%d,F%d,CAN%d,PO%d,ZB%d\r\n",HostAddr,SysDate.Dogflg,Fback.LineFlg,DCFState.LineFlg,ResButton.ButtonFlg,ReportInfo.CanCount,SysDate.Powerflg,SysDate.MBpower);
+    ResButton.ButtonFlg=1;//**********待考虑************什么时候清零复位按键********************
+    SysDate.Servel++;
+    return back;
+}
+uint16_t CRCnow=0,CRCrx=0;
+//*******处理6Q接收数据程序****************************************
+void DelRxdate(void)
+{
+    uint16_t CRCnow=0,CRCrx=0;
+    if(Uart1_Rxflg==1)//接收到数据
+    {
+//        ClearDog();
+        CRCrx=Uart1_RxBuff[15];
+        CRCnow=Crc_RTU_Data(Uart1_RxBuff,15);
+        if((CRCnow==CRCrx)&&(Uart1_RxBuff[0]==0xA5)&&(Uart1_RxBuff[1]==0x5A))//收到正确数据
+        {
+            Q6State.NorMalflg=1;
+            Q6State.Q6timeOut=0;
+            memcpy((uint8_t *)&ReceiveInfo,Uart1_RxBuff,sizeof(ReceiveInfo));//复制进结构体
+            //***********先回复后干活************************************************
+            if(ReceiveInfo.SendMode==1)
+            {
+                //需要回复数据
+                SendSensorState(ReceiveInfo.Serial,2,0);//发送回复数据
+            }
+            else
+            {
+                //*****是对方回复数据***********
+
+            }
+//*********************看门狗状态***********************************
+            if(ReceiveInfo.DogCtr==1)//停止看门狗
+            {
+                //******看门狗停止*********************
+                DogOff();
+                SysDate.Dogflg=1;
+//							LED7_Off;
+            }
+            else
+            {
+                //******看门狗启动*************************
+                DogOn();
+                SysDate.Dogflg=2;
+//							LED7_On;
+            }
+//*******************6A通信*****************************************
+            if(ReceiveInfo.A6_State==2)
+            {
+                LED2_Off;//6A通信异常
+                SysDate.A6_state=0;//异常
+            }
+            else
+            {
+                //****6A 正常*****************
+                SysDate.A6_state=1;//正常
+            }
+//************************故障**************************************
+            if(ReceiveInfo.Fault_State==2)
+            {
+                LED3_On;//故障
+            }
+            else
+            {
+
+            }
+//*******************火警状态***************************************
+            if(ReceiveInfo.Alarm_State==2)
+            {
+                LED4_On;//火警
+            }
+            else
+            {
+                //**********************************
+            }
+//***************电磁阀灭火**********************************************************************
+            if(ReceiveInfo.Miehuo_State==2)
+            {
+                //灭火动作
+                //切换继电器，点亮LED，启动灭火500ms
+                DCFState.LineState=LineControl;//灭火状态
+                RelayCheck_Off;
+                LED5_On;
+                ClearDog();
+                delay_ms(10);
+                RelayCtrl_On;
+                ClearDog();
+                delay_ms(500);//电磁阀通电500ms
+                ClearDog();
+                delay_ms(500);//电磁阀通电500ms
+                RelayCtrl_Off;
+                DCFState.LineState=LineLook;
+                delay_ms(10);
+                ClearDog();
+                RelayCheck_On;
+                delay_ms(500);
+                ClearDog();
+            }
+//****************6Q 复位***************************************************************
+            if(ReceiveInfo.Q6Reset_State==2)
+            {
+                M6QRST_L;//6Q复位控制
+                delay_ms(500);
+                M6QRST_H;
+            }
+//***************维护状态***************************************************************
+            if(ReceiveInfo.Mainten_State==2)
+            {
+                LED6_On;//维护状态
+            }
+            else
+            {
+                //**********************************
+            }
+//***************清看门狗***************************************************************
+            if(ReceiveInfo.ClearDog>0)
+            {
+                ClearDog();
+            }
+            else
+            {
+                ;//**********************************
+            }
+//****************************************************************************************
+//            if(ReceiveInfo.Update==2)
+//            {
+//                //*******重启复位升级程序*****************
+//                while(1);//记得开启看门狗
+//            }
+//            if(ReceiveInfo.Mainten_State==2)
+//            {
+//                //*******维护状态*****************
+//                LED7_H;
+//            }
+        }
+        ResetUsart();
+    }
+}
+
+
+
+
+
+
